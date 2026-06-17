@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ことばノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400&family=Noto+Sans+JP:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#efefef; --surface:#fff; --border:#e0e0e0; --black:#111;
+    --gray-dark:#444; --gray-mid:#888; --gray-lt:#bbb;
+    --radius-lg:20px; --radius-md:12px; --radius-sm:8px;
+    --shadow:0 2px 12px rgba(0,0,0,.07); --shadow-lg:0 4px 24px rgba(0,0,0,.10);
+  }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--black); font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif; font-weight:400; min-height:100vh; overflow-x:hidden; }
+
+  /* ── ログイン画面 ── */
+  #login-screen {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:100vh; padding:32px 24px; text-align:center;
+  }
+  .login-logo { font-family:'Noto Serif JP',serif; font-size:1.6rem; font-weight:300; letter-spacing:.1em; color:var(--black); margin-bottom:8px; }
+  .login-sub { font-size:.85rem; color:var(--gray-mid); margin-bottom:48px; }
+  .btn-google {
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface); border:1.5px solid var(--border); border-radius:100px;
+    padding:14px 28px; font-family:'Noto Sans JP',sans-serif; font-size:.9rem; font-weight:500;
+    color:var(--black); cursor:pointer; box-shadow:var(--shadow); transition:all .15s;
+  }
+  .btn-google:hover { box-shadow:var(--shadow-lg); border-color:#aaa; }
+  .btn-google svg { width:20px; height:20px; flex-shrink:0; }
+  .login-note { font-size:.7rem; color:var(--gray-lt); margin-top:20px; line-height:1.8; }
+
+  /* ── ローディング ── */
+  #loading-screen {
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; flex-direction:column; gap:16px;
+  }
+  .spinner {
+    width:32px; height:32px; border:2px solid var(--border);
+    border-top-color:var(--black); border-radius:50%;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-text { font-size:.8rem; color:var(--gray-mid); }
+
+  /* ── アプリ本体（ログイン後） ── */
+  #app-screen { display:none; }
+
+  /* ── ナビ ── */
+  nav { display:flex; align-items:center; justify-content:space-between; padding:18px 28px; background:var(--bg); position:relative; z-index:10; }
+  .nav-logo { font-family:'Noto Serif JP',serif; font-size:1.1rem; font-weight:400; color:var(--black); letter-spacing:.06em; display:flex; align-items:center; gap:8px; }
+  .nav-logo svg { width:28px; height:28px; }
+  .nav-right { display:flex; align-items:center; gap:12px; }
+  .nav-user { font-size:.72rem; color:var(--gray-mid); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nav-menu { width:36px; height:36px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:5px; cursor:pointer; background:transparent; border:none; padding:0; z-index:201; }
+  .nav-menu span { display:block; width:20px; height:1.5px; background:var(--black); border-radius:2px; transition:all .25s; }
+  .nav-menu.open span:nth-child(1) { transform:translateY(6.5px) rotate(45deg); }
+  .nav-menu.open span:nth-child(2) { opacity:0; }
+  .nav-menu.open span:nth-child(3) { transform:translateY(-6.5px) rotate(-45deg); }
+
+  /* ── ドロワー ── */
+  .drawer-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:100; backdrop-filter:blur(2px); }
+  .drawer-overlay.open { display:block; }
+  .drawer { position:fixed; top:0; right:-340px; width:320px; height:100vh; background:var(--surface); z-index:200; transition:right .3s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; box-shadow:-4px 0 24px rgba(0,0,0,.12); }
+  .drawer.open { right:0; }
+  .drawer-header { padding:24px 24px 16px; border-bottom:1px solid var(--border); }
+  .drawer-title { font-family:'Noto Serif JP',serif; font-size:1rem; font-weight:400; color:var(--black); letter-spacing:.06em; }
+  .drawer-sub { font-size:.7rem; color:var(--gray-mid); margin-top:3px; }
+  .drawer-body { flex:1; overflow-y:auto; padding:16px; }
+  .drawer-section-title { font-size:.68rem; color:var(--gray-mid); letter-spacing:.1em; text-transform:uppercase; margin-bottom:12px; margin-top:4px; }
+  .btn-signout { width:100%; margin-top:16px; padding:12px; border-radius:var(--radius-md); border:1.5px solid var(--border); background:transparent; color:var(--gray-dark); font-family:'Noto Sans JP',sans-serif; font-size:.82rem; cursor:pointer; transition:all .15s; }
+  .btn-signout:hover { border-color:#c0392b; color:#c0392b; }
+  .trash-item { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--bg); border-radius:var(--radius-md); margin-bottom:8px; }
+  .trash-item-word { flex:1; font-family:'Noto Serif JP',serif; font-size:.92rem; color:var(--black); line-height:1.4; }
+  .trash-item-date { font-size:.62rem; color:var(--gray-lt); margin-top:2px; }
+  .trash-actions { display:flex; gap:6px; flex-shrink:0; }
+  .btn-restore { font-size:.7rem; padding:5px 10px; border-radius:100px; border:1.5px solid var(--black); background:transparent; color:var(--black); cursor:pointer; font-family:'Noto Sans JP',sans-serif; font-weight:500; transition:all .15s; white-space:nowrap; }
+  .btn-restore:hover { background:var(--black); color:#fff; }
+  .btn-perm-del { font-size:.7rem; padding:5px 10px; border-radius:100px; border:1.5px solid var(--border); background:transparent; color:var(--gray-mid); cursor:pointer; font-family:'Noto Sans JP',sans-serif; font-weight:500; transition:all .15s; white-space:nowrap; }
+  .btn-perm-del:hover { border-color:#c0392b; color:#c0392b; }
+  .trash-empty { text-align:center; padding:40px 0; color:var(--gray-lt); font-size:.82rem; line-height:2; }
+
+  /* ── ヒーロー ── */
+  .hero { text-align:center; padding:52px 24px 40px; }
+  .hero h1 { font-family:'Noto Sans JP',sans-serif; font-size:clamp(2rem,6vw,2.8rem); font-weight:700; color:var(--black); letter-spacing:-.01em; line-height:1.2; margin-bottom:14px; }
+  .hero p { font-size:.95rem; color:var(--gray-mid); font-weight:300; }
+
+  /* ── タブ ── */
+  .tab-bar { display:flex; justify-content:center; margin:0 auto 32px; background:var(--surface); border-radius:100px; width:fit-content; padding:5px; box-shadow:var(--shadow); gap:2px; }
+  .tab-btn { font-family:'Noto Sans JP',sans-serif; font-size:.82rem; font-weight:500; letter-spacing:.04em; padding:8px 22px; border:none; border-radius:100px; cursor:pointer; background:transparent; color:var(--gray-mid); transition:background .18s,color .18s; }
+  .tab-btn.active { background:var(--black); color:var(--surface); box-shadow:0 1px 4px rgba(0,0,0,.18); }
+
+  /* ── メイン ── */
+  .main-wrap { max-width:680px; margin:0 auto; padding:0 20px 80px; }
+  .section { display:none; }
+  .section.active { display:block; }
+
+  /* ── 入力カード ── */
+  .input-card { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:24px 24px 16px; margin-bottom:16px; }
+  .input-card textarea { width:100%; background:transparent; border:none; outline:none; font-family:'Noto Sans JP',sans-serif; font-weight:300; font-size:16px; color:var(--black); line-height:1.8; resize:none; min-height:110px; pointer-events:auto; -webkit-user-select:text; user-select:text; }
+  .input-card textarea::placeholder { color:var(--gray-lt); font-size:.95rem; }
+  .paste-btn-wrap { display:flex; justify-content:flex-end; margin-bottom:10px; }
+  .btn-paste { display:flex; align-items:center; gap:6px; font-family:'Noto Sans JP',sans-serif; font-size:.78rem; font-weight:500; color:var(--gray-mid); background:var(--bg); border:1.5px solid var(--border); border-radius:100px; padding:6px 14px; cursor:pointer; transition:all .15s; letter-spacing:.04em; }
+  .btn-paste svg { width:14px; height:14px; flex-shrink:0; }
+  .btn-paste:hover { border-color:var(--black); color:var(--black); }
+  .extract-bar { display:none; align-items:center; gap:8px; margin:8px 0 12px; padding:8px 12px; background:var(--bg); border-radius:var(--radius-sm); }
+  .extract-bar.show { display:flex; }
+  .extract-bar-label { font-size:.65rem; color:var(--gray-mid); letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+  .extract-bar-word { font-family:'Noto Serif JP',serif; font-size:.92rem; color:var(--black); }
+  .card-toolbar { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--border); margin-top:4px; }
+  .word-input-wrap input { background:var(--bg); border:none; border-radius:var(--radius-sm); padding:6px 12px; font-family:'Noto Sans JP',sans-serif; font-size:16px; color:var(--black); outline:none; width:180px; transition:box-shadow .15s; pointer-events:auto; }
+  .word-input-wrap input:focus { box-shadow:0 0 0 2px rgba(0,0,0,.12); }
+  .word-input-wrap input::placeholder { color:var(--gray-lt); }
+  .btn-send { width:42px; height:42px; border-radius:50%; background:var(--black); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .15s,transform .1s; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  .btn-send:hover { background:var(--gray-dark); }
+  .btn-send:active { transform:scale(.94); }
+  .btn-send svg { width:18px; height:18px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .toast { display:none; text-align:center; font-size:.75rem; color:var(--gray-dark); padding:8px 0; }
+
+  /* ── 検索バー ── */
+  .search-card { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:12px 20px; display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .search-card svg { width:16px; height:16px; stroke:var(--gray-lt); flex-shrink:0; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .search-card input { flex:1; background:transparent; border:none; outline:none; font-family:'Noto Sans JP',sans-serif; font-size:16px; color:var(--black); font-weight:300; }
+  .search-card input::placeholder { color:var(--gray-lt); }
+
+  /* ── 表示切替 ── */
+  .view-toggle { display:flex; gap:8px; margin-bottom:16px; justify-content:flex-end; }
+  .view-btn { font-family:'Noto Sans JP',sans-serif; font-size:.72rem; font-weight:500; padding:6px 14px; border-radius:100px; border:1.5px solid var(--border); background:transparent; color:var(--gray-mid); cursor:pointer; transition:all .15s; letter-spacing:.04em; }
+  .view-btn.active { background:var(--black); border-color:var(--black); color:#fff; }
+
+  /* ── 通常カード ── */
+  .cards-list { display:flex; flex-direction:column; gap:8px; }
+  .word-card { background:var(--surface); border-radius:var(--radius-md); box-shadow:var(--shadow); padding:18px 20px; display:grid; grid-template-columns:1fr auto; gap:8px 16px; transition:box-shadow .15s; }
+  .word-card:hover { box-shadow:var(--shadow-lg); }
+  .card-word { font-family:'Noto Serif JP',serif; font-size:1rem; font-weight:400; color:var(--black); line-height:1.4; grid-column:1; grid-row:1; }
+  .card-meaning { font-size:.8rem; font-weight:300; color:var(--gray-dark); line-height:1.75; white-space:pre-wrap; word-break:break-all; grid-column:1; grid-row:2; margin-top:2px; }
+  .card-date { font-size:.62rem; color:var(--gray-lt); letter-spacing:.04em; grid-column:1; grid-row:3; margin-top:8px; }
+  .card-del { grid-column:2; grid-row:1; background:transparent; border:none; color:var(--border); font-size:.85rem; cursor:pointer; padding:0; line-height:1; transition:color .15s; align-self:start; }
+  .card-del:hover { color:var(--gray-dark); }
+
+  /* ── フラッシュカード ── */
+  .flash-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:480px) { .flash-grid { grid-template-columns:1fr; } }
+  .flash-scene { perspective:900px; cursor:pointer; }
+  .flash-inner { position:relative; width:100%; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.4,.2,.2,1); display:grid; }
+  .flash-scene.flipped .flash-inner { transform:rotateY(180deg); }
+  .flash-front, .flash-back { grid-area:1/1; border-radius:var(--radius-md); backface-visibility:hidden; -webkit-backface-visibility:hidden; display:flex; align-items:center; justify-content:center; padding:20px 16px; box-shadow:var(--shadow); }
+  .flash-front { background:var(--surface); flex-direction:column; gap:8px; min-height:100px; }
+  .flash-front-word { font-family:'Noto Serif JP',serif; font-size:1.05rem; font-weight:400; color:var(--black); text-align:center; line-height:1.4; }
+  .flash-hint { font-size:.6rem; color:var(--gray-lt); letter-spacing:.1em; }
+  .flash-back { background:var(--black); transform:rotateY(180deg); flex-direction:column; align-items:flex-start; justify-content:flex-start; }
+  .flash-back-word { font-family:'Noto Serif JP',serif; font-size:.78rem; font-weight:400; color:rgba(255,255,255,.5); margin-bottom:8px; flex-shrink:0; }
+  .flash-back-meaning { font-size:.75rem; font-weight:300; color:rgba(255,255,255,.85); line-height:1.75; white-space:pre-wrap; word-break:break-all; }
+
+  /* ── 空状態 ── */
+  .empty-state { text-align:center; padding:56px 0; color:var(--gray-lt); font-size:.82rem; line-height:2.2; }
+  .empty-icon { font-size:2.2rem; margin-bottom:8px; }
+
+  @media (max-width:500px) { .hero h1 { font-size:1.8rem; } nav { padding:14px 18px; } }
+</style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text">読み込み中…</div>
+</div>
+
+<!-- ログイン画面 -->
+<div id="login-screen" style="display:none;">
+  <div class="login-logo">ことばノート</div>
+  <div class="login-sub">気になった言葉を、自分だけの辞書に。</div>
+  <button class="btn-google" onclick="signInWithGoogle()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    Googleアカウントでログイン
+  </button>
+  <div class="login-note">ログイン情報はGoogleによって安全に管理されます。<br>iPhoneとiPadで単語リストが同期されます。</div>
+</div>
+
+<!-- アプリ本体 -->
+<div id="app-screen">
+
+  <!-- ドロワー -->
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">メニュー</div>
+      <div class="drawer-sub" id="drawer-user-email"></div>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section-title">ゴミ箱</div>
+      <div id="drawer-body-trash"></div>
+      <button class="btn-signout" onclick="signOut()">ログアウト</button>
+    </div>
+  </div>
+
+  <!-- ナビ -->
+  <nav>
+    <div class="nav-logo">
+      <svg viewBox="0 0 28 28" fill="none">
+        <rect x="4" y="4" width="20" height="20" rx="5" stroke="#111" stroke-width="1.5"/>
+        <line x1="9" y1="10" x2="19" y2="10" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="14" x2="19" y2="14" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="18" x2="14" y2="18" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      ことばノート
+    </div>
+    <div class="nav-right">
+      <span class="nav-user" id="nav-user-name"></span>
+      <button class="nav-menu" id="nav-menu-btn" onclick="toggleDrawer()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ヒーロー -->
+  <div class="hero">
+    <h1>書き留める。<br>忘れない。</h1>
+    <p>気になった言葉を、自分だけの辞書に。</p>
+  </div>
+
+  <!-- タブ -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('record')">記録する</button>
+    <button class="tab-btn" onclick="switchTab('list')">一覧 <span id="tab-count"></span></button>
+  </div>
+
+  <!-- メイン -->
+  <div class="main-wrap">
+    <!-- 記録タブ -->
+    <div class="section active" id="sec-record">
+      <div class="input-card">
+        <div class="paste-btn-wrap">
+          <button class="btn-paste" onclick="pasteFromClipboard()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="2" width="6" height="4" rx="1"/>
+              <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/>
+            </svg>
+            貼り付け
+          </button>
+        </div>
+        <textarea id="inp-meaning" placeholder="ここに調べた内容を入力…" oninput="onMeaningInput()"></textarea>
+        <div class="extract-bar" id="extract-bar">
+          <span class="extract-bar-label">単語</span>
+          <span class="extract-bar-word" id="preview-word"></span>
+        </div>
+        <div class="card-toolbar">
+          <div class="word-input-wrap">
+            <input type="text" id="inp-word" placeholder="単語（自動入力）" maxlength="100">
+          </div>
+          <button class="btn-send" onclick="saveEntry()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="toast" id="toast"></p>
+    </div>
+
+    <!-- 一覧タブ -->
+    <div class="section" id="sec-list">
+      <div class="search-card">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="inp-search" placeholder="単語を検索…" oninput="renderCards()">
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-view-list"  onclick="setView('list')">一覧</button>
+        <button class="view-btn"        id="btn-view-flash" onclick="setView('flash')">テスト</button>
+      </div>
+      <div id="cards-container"></div>
+    </div>
+  </div>
+
+</div><!-- /app-screen -->
+
+<!-- Firebase SDK -->
+<script type="module">
+  /* modulepreload でFirebase SDKを先読み */
+  const [
+    { initializeApp },
+    { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut: fbSignOut },
+    { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy }
+  ] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),
+    import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'),
+  ]);
+
+  /* ── Firebase 初期化 ── */
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCw9S99LWE5u2yhDXzkwgGkN2wTbZv4D_c",
+    authDomain:        "kotoba-note.firebaseapp.com",
+    projectId:         "kotoba-note",
+    storageBucket:     "kotoba-note.firebasestorage.app",
+    messagingSenderId: "1047556066792",
+    appId:             "1:1047556066792:web:0a4075ea0f816866ae285d"
+  };
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const db       = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  let currentUser = null;
+  let viewMode    = 'list';
+  let unsubEntries = null;
+  let unsubTrash   = null;
+  let entries = [];
+  let trash   = [];
+
+  /* ── ユーティリティ ── */
+  function show(id)  { document.getElementById(id).style.display = ''; }
+  function hide(id)  { document.getElementById(id).style.display = 'none'; }
+  function esc(s)    { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function showToast(msg, ok) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    t.style.color = ok ? '#555' : '#c0392b';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = 'none'; }, 2800);
+  }
+
+  /* ── 認証 ── */
+  window.signInWithGoogle = async () => {
+    try { await signInWithPopup(auth, provider); }
+    catch(e) { console.error(e); }
+  };
+
+  window.signOut = async () => {
+    if (unsubEntries) unsubEntries();
+    if (unsubTrash)   unsubTrash();
+    await fbSignOut(auth);
+  };
+
+  /* 前回ログイン済みかチェックしてローディング表示を最適化 */
+  const wasLoggedIn = localStorage.getItem('kotoba_logged_in') === '1';
+  if (!wasLoggedIn) {
+    /* 未ログインなら即ログイン画面を表示してローディングを隠す */
+    hide('loading-screen');
+    show('login-screen');
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  onAuthStateChanged(auth, user => {
+    hide('loading-screen');
+    if (user) {
+      localStorage.setItem('kotoba_logged_in', '1');
+      currentUser = user;
+      document.getElementById('nav-user-name').textContent     = user.displayName || '';
+      document.getElementById('drawer-user-email').textContent = user.email || '';
+      hide('login-screen');
+      document.getElementById('login-screen').style.display = 'none';
+      show('app-screen');
+      document.getElementById('app-screen').style.display = 'block';
+      subscribeData();
+    } else {
+      localStorage.removeItem('kotoba_logged_in');
+      currentUser = null;
+      if (unsubEntries) unsubEntries();
+      if (unsubTrash)   unsubTrash();
+      hide('app-screen');
+      document.getElementById('app-screen').style.display = 'none';
+      show('login-screen');
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  });
+
+  /* ── Firestore リアルタイム購読 ── */
+  function subscribeData() {
+    const uid = currentUser.uid;
+
+    unsubEntries = onSnapshot(
+      query(collection(db, 'users', uid, 'entries'), orderBy('createdAt', 'desc')),
+      snap => {
+        entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateTabCount();
+        if (document.getElementById('sec-list').classList.contains('active')) renderCards();
+      }
+    );
+
+    unsubTrash = onSnapshot(
+      query(collection(db, 'users', uid, 'trash'), orderBy('deletedAt', 'desc')),
+      snap => {
+        trash = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (document.getElementById('drawer').classList.contains('open')) renderTrash();
+      }
+    );
+  }
+
+  /* ── 保存 ── */
+  window.saveEntry = async () => {
+    const wordEl    = document.getElementById('inp-word');
+    const meaningEl = document.getElementById('inp-meaning');
+    const word    = wordEl.value.trim();
+    const meaning = meaningEl.value.trim();
+    if (!word && !meaning) { showToast('内容を入力してください', false); return; }
+    if (!word)             { showToast('単語欄に入力してください', false); return; }
+
+    const uid = currentUser.uid;
+    const id  = Date.now().toString();
+    await setDoc(doc(db, 'users', uid, 'entries', id), {
+      word, meaning,
+      createdAt: new Date().toISOString(),
+      date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' })
+    });
+
+    meaningEl.value = ''; wordEl.value = '';
+    document.getElementById('extract-bar').classList.remove('show');
+    meaningEl.focus();
+    showToast('「' + word + '」を保存しました', true);
+  };
+
+  /* ── 削除（ゴミ箱へ） ── */
+  window.deleteEntry = async (id) => {
+    const item = entries.find(e => e.id === id);
+    if (!item) return;
+    const uid = currentUser.uid;
+    await setDoc(doc(db, 'users', uid, 'trash', id), {
+      ...item,
+      deletedAt: new Date().toISOString(),
+      date: new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' })
+    });
+    await deleteDoc(doc(db, 'users', uid, 'entries', id));
+  };
+
+  /* ── 復元 ── */
+  window.restoreEntry = async (id) => {
+    const item = trash.find(e => e.id === id);
+    if (!item) return;
+    const uid = currentUser.uid;
+    const { deletedAt, ...rest } = item;
+    await setDoc(doc(db, 'users', uid, 'entries', id), { ...rest, createdAt: rest.createdAt || new Date().toISOString() });
+    await deleteDoc(doc(db, 'users', uid, 'trash', id));
+    renderTrash();
+  };
+
+  /* ── 完全削除 ── */
+  window.permDelete = async (id) => {
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'trash', id));
+  };
+
+  /* ── タブ ── */
+  window.switchTab = (tab) => {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', (i===0)===(tab==='record')));
+    document.getElementById('sec-record').classList.toggle('active', tab === 'record');
+    document.getElementById('sec-list').classList.toggle('active',   tab === 'list');
+    if (tab === 'list') renderCards();
+  };
+
+  /* ── 表示モード ── */
+  window.setView = (mode) => {
+    viewMode = mode;
+    document.getElementById('btn-view-list').classList.toggle('active',  mode === 'list');
+    document.getElementById('btn-view-flash').classList.toggle('active', mode === 'flash');
+    renderCards();
+  };
+
+  /* ── 単語自動抽出 ── */
+  function extractWord(text) {
+    const firstLine = text.split('\n')[0].trim();
+    if (!firstLine) return '';
+    if (/^(意味|例文|用例|解説|補足)[：:]/.test(firstLine)) return '';
+    if (firstLine.length > 50) return '';
+    return firstLine;
+  }
+  window.onMeaningInput = () => {
+    const word = extractWord(document.getElementById('inp-meaning').value);
+    const bar  = document.getElementById('extract-bar');
+    if (word) {
+      document.getElementById('inp-word').value = word;
+      document.getElementById('preview-word').textContent = word;
+      bar.classList.add('show');
+    } else { bar.classList.remove('show'); }
+  };
+
+  /* ── クリップボード貼り付け ── */
+  window.pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) { showToast('クリップボードが空です', false); return; }
+      const el = document.getElementById('inp-meaning');
+      el.value = text; window.onMeaningInput(); el.focus();
+      showToast('貼り付けました', true);
+    } catch { showToast('テキストエリアを長押しして貼り付けてください', false); }
+  };
+
+  /* ── ドロワー ── */
+  window.toggleDrawer = () => {
+    const drawer  = document.getElementById('drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    const btn     = document.getElementById('nav-menu-btn');
+    if (drawer.classList.contains('open')) { closeDrawer(); return; }
+    drawer.classList.add('open'); overlay.classList.add('open'); btn.classList.add('open');
+    renderTrash();
+  };
+  window.closeDrawer = () => {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer-overlay').classList.remove('open');
+    document.getElementById('nav-menu-btn').classList.remove('open');
+  };
+
+  /* ── ゴミ箱描画 ── */
+  function renderTrash() {
+    const body = document.getElementById('drawer-body-trash');
+    if (trash.length === 0) { body.innerHTML = '<div class="trash-empty">🗑️<br>ゴミ箱は空です</div>'; return; }
+    body.innerHTML = trash.map(e => `
+      <div class="trash-item">
+        <div class="trash-item-word">
+          ${esc(e.word)}
+          <div class="trash-item-date">${e.date} に削除</div>
+        </div>
+        <div class="trash-actions">
+          <button class="btn-restore"  onclick="restoreEntry('${e.id}')">復元</button>
+          <button class="btn-perm-del" onclick="permDelete('${e.id}')">削除</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  /* ── 一覧描画 ── */
+  function renderCards() {
+    const q         = document.getElementById('inp-search').value.trim().toLowerCase();
+    const container = document.getElementById('cards-container');
+    const filtered  = q ? entries.filter(e => e.word.toLowerCase().includes(q) || (e.meaning||'').toLowerCase().includes(q)) : entries;
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📖</div>${entries.length===0?'記録がありません<br>気になった言葉を書き留めてみましょう':'該当する記録がありません'}</div>`;
+      return;
+    }
+
+    if (viewMode === 'flash') {
+      container.innerHTML = `<div class="flash-grid">${filtered.map(e=>`
+        <div class="flash-scene" onclick="toggleFlip(this)">
+          <div class="flash-inner">
+            <div class="flash-front"><div class="flash-front-word">${esc(e.word)}</div><div class="flash-hint">タップして確認</div></div>
+            <div class="flash-back"><div class="flash-back-word">${esc(e.word)}</div><div class="flash-back-meaning">${esc(e.meaning||'（メモなし）')}</div></div>
+          </div>
+        </div>`).join('')}</div>`;
+    } else {
+      container.innerHTML = `<div class="cards-list">${filtered.map(e=>`
+        <div class="word-card">
+          <div class="card-word">${esc(e.word)}</div>
+          <button class="card-del" onclick="deleteEntry('${e.id}')">✕</button>
+          <div class="card-meaning">${esc(e.meaning||'（メモなし）')}</div>
+          <div class="card-date">${e.date}</div>
+        </div>`).join('')}</div>`;
+    }
+  }
+
+  window.toggleFlip = (el) => { el.classList.toggle('flipped'); };
+
+  function updateTabCount() {
+    const n = entries.length;
+    document.getElementById('tab-count').textContent = n > 0 ? `(${n})` : '';
+  }
+</script>
+</body>
+</html>
